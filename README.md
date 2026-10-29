@@ -26,6 +26,9 @@ $EDITOR envs/demo/cluster.yml
 export KUBECONFIG=$PWD/envs/demo/.state/kubeconfig
 ```
 
+`examples/` has ready-made environments: `./lab up examples/almalinux`, or copy one to `envs/<name>/`.
+Your `envs/` stay local (gitignored).
+
 Optional: `ln -s "$PWD/lab" ~/.local/bin/lab` to run it from anywhere.
 
 ## Commands
@@ -117,7 +120,7 @@ Current components (`lab components -v` for all options):
 | `ingress` | `traefik`, `haproxy`, `ingress-nginx` (retired upstream, legacy only); fixed LB IP option |
 | `gateway` | Gateway API: `envoy-gateway`, `nginx-gateway-fabric`, `traefik`; installs CRDs when needed, creates a shared `Gateway` |
 | `cert_manager` | issuers `selfsigned`, `ca` (local CA), `acme` (HTTP-01 through the shared Gateway or the ingress class) |
-| `ceph_demo` | Ceph in a docker container on the host (ported from the old `ansible/` setup) |
+| `ceph_demo` | single-container Ceph (`quay.io/ceph/demo`) in docker on the host, reachable from the VMs; for testing only |
 | `ceph_csi` | RBD StorageClass, auto-configured from `ceph_demo` or pointed to an external cluster |
 
 ### Adding things for one project
@@ -165,7 +168,6 @@ Not yet exercised on a real run: flannel, ingress-nginx, the traefik gateway pro
   (crypt(3), `openssl passwd -6`), `infra.password_file`, or `$LAB_PASSWORD`. A plaintext one is hashed
   with a salt derived from env+password, so `lab create` is idempotent (a random salt would rebuild
   every VM on each apply).
-- `envs/` is gitignored (your environments are yours); `examples/` has a sample. A gitleaks
-  pre-commit hook is configured: `pre-commit install`.
+- Contributing: a gitleaks pre-commit hook guards against committed secrets (`pre-commit install`).
 - Infra is libvirt-only for now; `infra/` is a plain tofu module, `lab` only needs its `nodes` output
   (`{hostname: {ip, pool}}`) to support another provider.
