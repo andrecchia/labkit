@@ -1,0 +1,38 @@
+argument_specs:
+  main:
+    short_description: Ceph CSI RBD
+    options:
+      ceph_csi_version:
+        type: str
+        description: ceph-csi-rbd chart version
+      ceph_csi_namespace:
+        type: str
+        description: Namespace
+      ceph_csi_driver_name:
+        type: str
+        description: CSI driver name
+      ceph_csi_storage_class:
+        type: str
+        description: StorageClass name
+      ceph_csi_default_class:
+        type: bool
+        description: Make it the default StorageClass
+      ceph_csi_cluster_id:
+        type: str
+        description: Ceph fsid (empty = read from the ceph_demo container)
+      ceph_csi_monitors:
+        type: list
+        elements: str
+        description: Monitor addresses host:port (default the ceph_demo monitor)
+      ceph_csi_pool:
+        type: str
+        description: RBD pool
+      ceph_csi_user:
+        type: str
+        description: Ceph client user
+      ceph_csi_user_key:
+        type: str
+        description: Key of the user (empty = read from the ceph_demo container)
+      ceph_csi_values:
+        type: dict
+        description: Helm values merged over the generated ones

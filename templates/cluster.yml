@@ -1,0 +1,93 @@
+# labkit environment. Everything about this lab is in this file:
+#   lab check __NAME__     validate, show nodes and install order
+#   lab up __NAME__        create the VMs and install the components
+# Generated files (tofu state, inventory, playbook, kubeconfig) go to .state/ next to this file.
+
+name: __NAME__                    # prefix of VMs (__NAME__-<pool>-<n>), network and pool
+
+infra:
+  libvirt_uri: qemu:///system
+  network:
+    cidr: __CIDR__                # host = .1, VMs from .10, MetalLB default range = top of the subnet
+    # mode: nat                   # nat | route | open | none
+    # domain: __NAME__.lab        # DNS domain served to the VMs
+  # pool_path: ~/.local/share/labkit/pools/__NAME__   # where the VM disks live
+  image:
+    url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+    # path: /path/to/local.qcow2  # instead of url
+    # AlmaLinux: url: https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2  (user: almalinux)
+  user: ubuntu
+  ssh_key: __SSH_KEY__            # public key; the private one is the same path without .pub
+  # Console login (virsh console), off by default; ssh stays key-only unless ssh_password_auth: true.
+  # Never a plaintext password here: one of
+  # password_hash: "$6$..."       # crypt(3) hash: openssl passwd -6
+  # password_file: ~/.config/labkit/demo.pw   # plaintext file outside the repo (relative = env dir)
+  # or export LAB_PASSWORD=... before `lab create`
+  # ip_start: 10
+
+  # Node pools. Each pool is also an Ansible group; `groups` adds more groups.
+  # Components target groups: kubernetes needs k8s_control_plane (+ optional k8s_workers).
+  nodes:
+    cp:
+      count: 1
+      cpu: 2
+      memory: 4096                # MiB
+      disk: 20                    # GiB, the root filesystem grows to it
+      groups: [k8s_control_plane]
+    worker:
+      count: 2
+      cpu: 2
+      memory: 4096
+      disk: 20
+      groups: [k8s_workers]
+      # ip_offset: 20             # fixed IPs for this pool (.20, .21, ...), stable when pools are added
+      # extra_disks:
+      #   - {size: 20, mount_point: /data}            # GiB, filesystem default ext4
+
+  # cloud_init:
+  #   packages: [qemu-guest-agent]
+  #   runcmd: ["echo hello > /etc/motd"]
+  #   extra: {}                   # any cloud-config keys, merged over the generated ones
+
+# Components from the library (`lab components -v` lists them with every option).
+# Write only what you want to change: everything else uses the component defaults.
+# Order does not matter: dependencies decide it. `false` disables a component.
+components:
+  base:
+    # timezone: Europe/Rome
+    # extra_packages: [htop]
+
+  kubernetes:
+    version: "1.36"               # "1.36" = latest patch, "1.36.5" = exact (quote it!)
+    # pod_cidr: 10.244.0.0/16
+    # kube_proxy: false           # with cilium kube-proxy replacement
+
+  cni:
+    provider: cilium              # cilium | calico | flannel
+    # version: "1.20.2"
+    # values: {hubble: {relay: {enabled: true}}}
+
+  metallb:
+    # pools: [{name: default, addresses: ["192.168.150.200-192.168.150.250"]}]
+
+  # Pick an ingress controller, the Gateway API, or both.
+  gateway:
+    provider: envoy-gateway       # envoy-gateway | nginx-gateway-fabric | traefik
+  # ingress:
+  #   provider: traefik           # traefik | haproxy | ingress-nginx
+  #   load_balancer_ip: 192.168.150.200
+
+  cert_manager:
+    # issuers:
+    #   - {name: selfsigned, type: selfsigned}
+    #   - {name: lab-ca, type: ca}
+    #   - {name: letsencrypt, type: acme, email: you@example.com,
+    #      server: https://acme-v02.api.letsencrypt.org/directory}
+
+  # ceph_demo:                    # Ceph in a container on this machine (needs docker)
+  # ceph_csi:                     # RBD StorageClass on top of it
+
+# Project-specific additions:
+# libraries: [../../my-project/ansible/roles]   # more component roles (also <env>/roles is searched)
+# playbooks: [post-install.yml]                 # plain playbooks run after the components (full install)
+# vars: {}                                      # any extra Ansible variable, for every host

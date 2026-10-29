@@ -1,0 +1,53 @@
+argument_specs:
+  main:
+    short_description: Kubernetes cluster bootstrapped with kubeadm
+    options:
+      kubernetes_version:
+        type: str
+        description: Minor ("1.36", latest patch) or exact ("1.36.5") version
+      kubernetes_cluster_name:
+        type: str
+        description: Cluster name (kubeconfig context is kubernetes-admin@NAME)
+      kubernetes_pod_cidr:
+        type: str
+        description: Pod network CIDR (the CNI component uses it)
+      kubernetes_service_cidr:
+        type: str
+        description: Service network CIDR
+      kubernetes_dns_domain:
+        type: str
+        description: Cluster DNS domain
+      kubernetes_control_plane_endpoint:
+        type: str
+        description: host:port of the API server (default first control-plane node; set a VIP/LB for HA)
+      kubernetes_api_cert_sans:
+        type: list
+        elements: str
+        description: Extra SANs for the API server certificate
+      kubernetes_kube_proxy:
+        type: bool
+        description: Install kube-proxy (false when the CNI replaces it, e.g. cilium kube_proxy_replacement)
+      kubernetes_schedule_on_control_plane:
+        type: raw
+        description: Run workloads on control-plane nodes - true, false or auto (= only when there are no workers)
+      kubernetes_containerd_version:
+        type: str
+        description: containerd release (github.com/containerd/containerd)
+      kubernetes_runc_version:
+        type: str
+        description: runc release
+      kubernetes_cni_plugins_version:
+        type: str
+        description: CNI reference plugins release (installed in /opt/cni/bin)
+      kubernetes_init_config:
+        type: dict
+        description: Merged into kubeadm InitConfiguration
+      kubernetes_cluster_config:
+        type: dict
+        description: Merged into kubeadm ClusterConfiguration (e.g. apiServer.extraArgs)
+      kubernetes_kubelet_config:
+        type: dict
+        description: Merged into KubeletConfiguration
+      kubernetes_admin_kubeconfig:
+        type: str
+        description: Admin kubeconfig on the control plane, used by the add-on components

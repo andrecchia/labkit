@@ -1,0 +1,18 @@
+# Example env: AlmaLinux 10 single node, calico, nginx-gateway-fabric + haproxy ingress.
+# Use it with:  lab check examples/almalinux   (or copy it to envs/<name>/)
+name: alma
+infra:
+  network: {cidr: 192.168.151.0/24}
+  image: {url: https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-latest.x86_64.qcow2}
+  user: almalinux
+  # ssh_key: ~/.ssh/id_ed25519.pub        # default
+  nodes:
+    cp: {count: 1, cpu: 4, memory: 5120, disk: 20, groups: [k8s_control_plane]}
+components:
+  base: {timezone: UTC}
+  kubernetes: {version: "1.35.9"}
+  cni: {provider: calico}
+  metallb:
+  gateway: {provider: nginx-gateway-fabric}
+  ingress: {provider: haproxy}
+  cert_manager:

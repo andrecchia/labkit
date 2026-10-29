@@ -1,0 +1,20 @@
+{% if _gw.controller is defined %}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ gateway_class }}
+spec:
+  controllerName: {{ _gw.controller }}
+{% endif %}
+{% if gateway_create %}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ gateway_name }}
+  namespace: {{ gateway_namespace }}
+spec:
+  gatewayClassName: {{ gateway_class }}
+  listeners: {{ gateway_listeners | to_json }}
+{% endif %}

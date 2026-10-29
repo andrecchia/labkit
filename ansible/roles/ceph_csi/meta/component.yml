@@ -1,0 +1,7 @@
+description: Ceph CSI RBD driver + StorageClass (uses ceph_demo, or an external Ceph cluster)
+hosts: k8s_control_plane[0]
+requires: [cni]
+after: [ceph]
+provides: [storage]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

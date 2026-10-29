@@ -1,0 +1,21 @@
+---
+kubernetes_version: "1.36"
+kubernetes_cluster_name: "{{ lab_env | default('kubernetes') }}"
+kubernetes_pod_cidr: 10.244.0.0/16
+kubernetes_service_cidr: 10.96.0.0/12
+kubernetes_dns_domain: cluster.local
+kubernetes_control_plane_endpoint: "{{ hostvars[groups['k8s_control_plane'][0]]['ansible_host'] }}:6443"
+kubernetes_api_cert_sans: []
+kubernetes_kube_proxy: true
+kubernetes_schedule_on_control_plane: auto
+
+kubernetes_containerd_version: "2.3.7"
+kubernetes_runc_version: "1.5.2"
+kubernetes_cni_plugins_version: "1.9.1"
+
+# Escape hatches: merged (recursively) into the generated kubeadm documents
+kubernetes_init_config: {}
+kubernetes_cluster_config: {}
+kubernetes_kubelet_config: {}
+
+kubernetes_admin_kubeconfig: /etc/kubernetes/admin.conf

@@ -1,0 +1,31 @@
+---
+- name: Read cluster id and user key from the ceph_demo container
+  ansible.builtin.command: "docker exec {{ ceph_demo_container }} {{ item }}"
+  loop:
+    - ceph fsid
+    - ceph auth get-key client.{{ ceph_csi_user }}
+  register: _ceph_demo_info
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  when: not (ceph_csi_cluster_id and ceph_csi_user_key)
+
+- name: Resolve the Ceph connection settings
+  ansible.builtin.set_fact:
+    _ceph_cluster_id: "{{ ceph_csi_cluster_id or _ceph_demo_info.results[0].stdout | trim }}"
+    _ceph_user_key: "{{ ceph_csi_user_key or _ceph_demo_info.results[1].stdout | trim }}"
+  no_log: true
+
+- name: Install ceph-csi-rbd
+  kubernetes.core.helm:
+    binary_path: "{{ helm_bin }}"
+    name: ceph-csi-rbd
+    chart_repo_url: https://ceph.github.io/csi-charts
+    chart_ref: ceph-csi-rbd
+    chart_version: "{{ ceph_csi_version }}"
+    release_namespace: "{{ ceph_csi_namespace }}"
+    create_namespace: true
+    values: "{{ lookup('ansible.builtin.template', 'values.yaml.j2') | from_yaml | combine(ceph_csi_values, recursive=True) }}"
+    wait: true
+    wait_timeout: 10m
+  no_log: true

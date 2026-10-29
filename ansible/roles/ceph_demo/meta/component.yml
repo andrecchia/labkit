@@ -1,0 +1,6 @@
+description: Single-container Ceph (quay.io/ceph/demo) on THIS machine, reachable from the VMs
+hosts: localhost
+connection: local
+become: false
+gather_facts: false
+provides: [ceph]

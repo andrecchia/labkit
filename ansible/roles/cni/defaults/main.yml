@@ -1,0 +1,52 @@
+---
+cni_provider: cilium
+cni_version: ""
+cni_values: {}
+cni_cilium_kube_proxy_replacement: "{{ not (kubernetes_kube_proxy | default(true)) }}"
+
+_cni_api_host: "{{ kubernetes_control_plane_endpoint.split(':')[0] }}"
+_cni_api_port: "{{ kubernetes_control_plane_endpoint.split(':')[1] | default(6443) | int }}"
+
+# Provider table: add an entry (and its name to `choices` in argument_specs) to support a new CNI.
+#   crds_chart: optional chart (same repo and version) holding CRDs, applied server-side first
+cni_catalog:
+  cilium:
+    repo: https://helm.cilium.io
+    chart: cilium
+    version: "1.20.2"
+    release: cilium
+    namespace: kube-system
+    values:
+      ipam:
+        mode: kubernetes # use the per-node podCIDRs allocated from kubernetes_pod_cidr
+      kubeProxyReplacement: "{{ cni_cilium_kube_proxy_replacement }}"
+      k8sServiceHost: "{{ _cni_api_host }}"
+      k8sServicePort: "{{ _cni_api_port }}"
+      operator:
+        replicas: 1
+  calico:
+    repo: https://docs.tigera.io/calico/charts
+    chart: tigera-operator
+    crds_chart: crd.projectcalico.org.v1 # since v3.32 the CRDs are a separate chart
+    version: "v3.32.2"
+    release: calico
+    namespace: tigera-operator
+    values:
+      installation:
+        cni:
+          type: Calico
+        calicoNetwork:
+          bgp: Disabled
+          ipPools:
+            - cidr: "{{ kubernetes_pod_cidr }}"
+              encapsulation: VXLAN
+              natOutgoing: Enabled
+              nodeSelector: all()
+  flannel:
+    repo: https://flannel-io.github.io/flannel/
+    chart: flannel
+    version: "v0.28.10"
+    release: flannel
+    namespace: kube-flannel
+    values:
+      podCidr: "{{ kubernetes_pod_cidr }}"

@@ -1,0 +1,30 @@
+---
+- name: Check whether this node is already part of a cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: _k8s_kubelet_conf
+
+- name: Remember node membership
+  ansible.builtin.set_fact:
+    _k8s_member: "{{ _k8s_kubelet_conf.stat.exists }}"
+
+- name: OS prerequisites (swap, kernel modules, sysctl)
+  ansible.builtin.include_tasks: prereqs.yml
+
+- name: Kubernetes packages (kubeadm, kubelet, kubectl)
+  ansible.builtin.include_tasks: "packages-{{ ansible_facts['os_family'] | lower }}.yml"
+  when: not _k8s_member # never change versions under a running cluster: that is a kubeadm upgrade
+
+- name: Container runtime (containerd, runc, CNI plugins)
+  ansible.builtin.include_tasks: containerd.yml
+
+- name: Initialize the first control-plane node
+  ansible.builtin.include_tasks: init.yml
+  when: inventory_hostname == _k8s_first_cp
+
+- name: Join the other nodes
+  ansible.builtin.include_tasks: join.yml
+
+- name: Kubeconfig for the user and for this machine
+  ansible.builtin.include_tasks: kubeconfig.yml
+  when: _k8s_is_cp

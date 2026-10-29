@@ -1,0 +1,24 @@
+argument_specs:
+  main:
+    short_description: OS baseline for every node
+    options:
+      base_packages:
+        type: list
+        elements: str
+        description: Packages installed on every node
+      base_extra_packages:
+        type: list
+        elements: str
+        description: Additional packages (add here instead of replacing base_packages)
+      base_timezone:
+        type: str
+        description: Timezone, e.g. Europe/Rome (empty = unchanged)
+      base_etc_hosts:
+        type: bool
+        description: Write every inventory host into /etc/hosts
+      base_upgrade:
+        type: bool
+        description: Upgrade all packages
+      base_reboot_if_needed:
+        type: bool
+        description: Reboot when the OS asks for it (e.g. after a kernel upgrade)

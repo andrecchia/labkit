@@ -1,0 +1,45 @@
+---
+- name: Check the CNI settings
+  ansible.builtin.assert:
+    that:
+      - cni_provider in cni_catalog
+      - not (cni_provider == 'cilium' and cni_cilium_kube_proxy_replacement | bool and kubernetes_kube_proxy | default(true))
+    fail_msg: >-
+      cilium kube_proxy_replacement needs the cluster without kube-proxy:
+      set `kube_proxy: false` in the kubernetes component.
+    quiet: true
+
+- name: Install the {{ cni_provider }} CRDs
+  ansible.builtin.shell: |
+    set -eo pipefail
+    {{ helm_bin }} template crds {{ _cni.crds_chart }} --repo {{ _cni.repo }} \
+      --version {{ cni_version or _cni.version }} > /tmp/{{ cni_provider }}-crds.yaml
+    kubectl diff --server-side -f /tmp/{{ cni_provider }}-crds.yaml >/dev/null && exit 0  # 1 = differences
+    kubectl apply --server-side --force-conflicts -f /tmp/{{ cni_provider }}-crds.yaml >/dev/null
+    echo applied
+  args:
+    executable: /bin/bash
+  register: _cni_crds
+  changed_when: "'applied' in _cni_crds.stdout"
+  when: _cni.crds_chart is defined
+  vars:
+    _cni: "{{ cni_catalog[cni_provider] }}"
+
+- name: Install {{ cni_provider }}
+  kubernetes.core.helm:
+    binary_path: "{{ helm_bin }}"
+    name: "{{ _cni.release }}"
+    chart_repo_url: "{{ _cni.repo }}"
+    chart_ref: "{{ _cni.chart }}"
+    chart_version: "{{ cni_version or _cni.version }}"
+    release_namespace: "{{ _cni.namespace }}"
+    create_namespace: true
+    values: "{{ _cni['values'] | combine(cni_values, recursive=True) }}"
+    wait: true
+    wait_timeout: 10m
+  vars:
+    _cni: "{{ cni_catalog[cni_provider] }}"
+
+- name: Wait for every node to be Ready
+  ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=600s
+  changed_when: false

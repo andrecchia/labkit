@@ -1,0 +1,64 @@
+---
+ingress_provider: traefik
+ingress_version: ""
+ingress_namespace: "{{ ingress_catalog[ingress_provider].namespace }}"
+ingress_class: "{{ ingress_catalog[ingress_provider].class }}"
+ingress_default_class: true
+ingress_service_type: LoadBalancer
+ingress_load_balancer_ip: ""
+ingress_values: {}
+
+_ingress_service:
+  type: "{{ ingress_service_type }}"
+  annotations: "{{ {'metallb.io/loadBalancerIPs': ingress_load_balancer_ip} if ingress_load_balancer_ip else {} }}"
+
+# Provider table: add an entry (and its name to `choices` in argument_specs) to support a new controller.
+ingress_catalog:
+  traefik:
+    repo: https://traefik.github.io/charts
+    chart: traefik
+    version: "41.7.1"
+    release: traefik
+    namespace: traefik
+    class: traefik
+    values:
+      ingressClass:
+        enabled: true
+        name: "{{ ingress_class }}"
+        isDefaultClass: "{{ ingress_default_class }}"
+      providers:
+        kubernetesIngress:
+          enabled: true
+        kubernetesGateway:
+          enabled: false
+      gateway:
+        enabled: false
+      service: "{{ _ingress_service }}"
+  haproxy:
+    repo: https://haproxytech.github.io/helm-charts
+    chart: kubernetes-ingress
+    version: "1.54.2"
+    release: haproxy
+    namespace: haproxy-controller
+    class: haproxy
+    values:
+      controller:
+        ingressClass: "{{ ingress_class }}"
+        ingressClassResource:
+          name: "{{ ingress_class }}"
+          default: "{{ ingress_default_class }}"
+        service: "{{ _ingress_service }}"
+  ingress-nginx:
+    repo: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    version: "4.15.1"
+    release: ingress-nginx
+    namespace: ingress-nginx
+    class: nginx
+    values:
+      controller:
+        ingressClassResource:
+          name: "{{ ingress_class }}"
+          default: "{{ ingress_default_class }}"
+        ingressClass: "{{ ingress_class }}"
+        service: "{{ _ingress_service }}"

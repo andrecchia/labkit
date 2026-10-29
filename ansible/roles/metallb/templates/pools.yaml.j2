@@ -1,0 +1,21 @@
+{% for pool in metallb_pools %}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ pool.name }}
+  namespace: {{ metallb_namespace }}
+spec:
+  addresses: {{ pool.addresses | to_json }}
+  autoAssign: {{ pool.auto_assign | default(true) | to_json }}
+{% endfor %}
+{% if metallb_l2_advertisement %}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: labkit
+  namespace: {{ metallb_namespace }}
+spec:
+  ipAddressPools: {{ metallb_pools | map(attribute='name') | list | to_json }}
+{% endif %}

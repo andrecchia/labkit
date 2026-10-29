@@ -1,0 +1,80 @@
+---
+- name: Disable swap now
+  ansible.builtin.command: swapoff -a
+  when: ansible_facts['swaptotal_mb'] | int > 0
+  changed_when: true
+
+- name: Disable swap at boot
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: SELinux permissive (RedHat family)
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+  when: ansible_facts['os_family'] == 'RedHat' and ansible_facts['selinux'].status | default('disabled') == 'enabled'
+
+- name: Collect services
+  ansible.builtin.service_facts:
+
+- name: Stop firewalld (the CNI manages packet filtering)
+  ansible.builtin.systemd_service:
+    name: firewalld
+    state: stopped
+    enabled: false
+  when: "'firewalld.service' in ansible_facts.services"
+
+# On RHEL/Alma br_netfilter lives in kernel-modules-extra, which may pull a newer
+# kernel than the running one: reboot only in that case.
+- name: Install kernel-modules-extra (RedHat family)
+  ansible.builtin.dnf:
+    name: kernel-modules-extra
+    state: present
+  register: _k8s_kmod_extra
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Reboot into the kernel matching kernel-modules-extra
+  ansible.builtin.reboot:
+    reboot_timeout: 600
+  when: _k8s_kmod_extra is changed
+
+- name: Load kernel modules at boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Load kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: [overlay, br_netfilter]
+
+- name: Kernel parameters for Kubernetes networking
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/90-kubernetes.conf
+    reload: true
+  loop:
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.ipv4.ip_forward
+
+- name: Check for NetworkManager
+  ansible.builtin.stat:
+    path: /etc/NetworkManager/conf.d
+  register: _k8s_nm
+
+- name: Keep NetworkManager away from CNI interfaces
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/90-kubernetes-cni.conf
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:cni*;interface-name:cali*;interface-name:cilium*;interface-name:lxc*;interface-name:flannel*;interface-name:vxlan*;interface-name:tunl*;interface-name:veth*
+    mode: "0644"
+  when: _k8s_nm.stat.exists

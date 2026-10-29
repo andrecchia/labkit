@@ -1,0 +1,5 @@
+description: Pod network (cilium, calico or flannel), installed with Helm
+hosts: k8s_control_plane[0]
+requires: [kubernetes]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

@@ -1,0 +1,31 @@
+---
+- name: Kubernetes apt repository (v{{ _k8s_minor }})
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: deb
+    uris: "https://pkgs.k8s.io/core:/stable:/v{{ _k8s_minor }}/deb/"
+    suites: /
+    signed_by: "https://pkgs.k8s.io/core:/stable:/v{{ _k8s_minor }}/deb/Release.key"
+  register: _k8s_repo
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+  when: _k8s_repo is changed
+
+- name: Install kubelet, kubeadm, kubectl {{ kubernetes_version }}
+  ansible.builtin.apt:
+    name: "{{ ['kubelet', 'kubeadm', 'kubectl'] | product([('=' ~ kubernetes_version ~ '-*') if _k8s_pinned else '']) | map('join') | list }}"
+    allow_change_held_packages: true
+    allow_downgrade: true
+
+- name: Hold Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [kubelet, kubeadm, kubectl]
+
+- name: Enable kubelet
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true

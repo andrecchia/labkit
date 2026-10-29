@@ -1,0 +1,73 @@
+---
+- name: Find the nodes that still have to join
+  ansible.builtin.set_fact:
+    _k8s_to_join: >-
+      {{ ansible_play_hosts | map('extract', hostvars) | rejectattr('_k8s_member')
+         | map(attribute='inventory_hostname') | list }}
+
+- name: Join material (token, CA hash, certificate key) from the first control plane
+  when: _k8s_to_join | length > 0
+  run_once: true
+  delegate_to: "{{ _k8s_first_cp }}"
+  block:
+    - name: Create a bootstrap token
+      ansible.builtin.command: kubeadm token create --ttl 30m --print-join-command
+      register: _k8s_join_cmd
+      changed_when: true
+
+    - name: Upload control-plane certificates (only when control planes join)
+      ansible.builtin.shell: |
+        set -e
+        key=$(kubeadm certs certificate-key)
+        kubeadm init phase upload-certs --upload-certs --certificate-key "$key" >/dev/null
+        echo "$key"
+      register: _k8s_cert_upload
+      changed_when: true
+      when: _k8s_to_join | select('in', groups['k8s_control_plane']) | list | length > 0
+
+    - name: Store the join material on the first control plane
+      ansible.builtin.set_fact:
+        _k8s_join_token: "{{ _k8s_join_cmd.stdout | regex_search('--token (\\S+)', '\\1') | first }}"
+        _k8s_join_ca_hash: "{{ _k8s_join_cmd.stdout | regex_search('--discovery-token-ca-cert-hash (\\S+)', '\\1') | first }}"
+        _k8s_cert_key: "{{ _k8s_cert_upload.stdout | default('') }}"
+      delegate_facts: true
+
+- name: Write the kubeadm join configuration
+  ansible.builtin.copy:
+    dest: /etc/kubernetes/kubeadm-join.yaml
+    mode: "0600"
+    content: |
+      {{ (_k8s_join_configuration | combine(_k8s_join_control_plane if _k8s_is_cp else {}))
+         | to_nice_yaml(indent=2) }}
+      ---
+      {{ _k8s_kubelet_configuration | combine(kubernetes_kubelet_config, recursive=True) | to_nice_yaml(indent=2) }}
+  when: inventory_hostname in _k8s_to_join
+
+- name: Join control-plane nodes (one at a time, etcd membership changes)
+  ansible.builtin.command: kubeadm join --config /etc/kubernetes/kubeadm-join.yaml
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+  throttle: 1
+  when: inventory_hostname in _k8s_to_join and _k8s_is_cp
+
+- name: Join worker nodes
+  ansible.builtin.command: kubeadm join --config /etc/kubernetes/kubeadm-join.yaml
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+  when: inventory_hostname in _k8s_to_join and not _k8s_is_cp
+
+# Workloads on control planes: remove the NoSchedule taint, and the label that keeps
+# load balancers (MetalLB L2) from announcing service IPs from these nodes.
+- name: Allow workloads and load-balancer traffic on control-plane nodes
+  ansible.builtin.command: "kubectl --kubeconfig {{ kubernetes_admin_kubeconfig }} {{ item }}"
+  loop:
+    - taint nodes {{ groups['k8s_control_plane'] | join(' ') }} node-role.kubernetes.io/control-plane:NoSchedule-
+    - label nodes {{ groups['k8s_control_plane'] | join(' ') }} node.kubernetes.io/exclude-from-external-load-balancers-
+  register: _k8s_untaint
+  changed_when: _k8s_untaint.stdout is search('untainted|unlabeled')
+  failed_when: _k8s_untaint.rc != 0 and 'not found' not in _k8s_untaint.stderr
+  run_once: true
+  delegate_to: "{{ _k8s_first_cp }}"
+  when: >-
+    kubernetes_schedule_on_control_plane | string | lower == 'true' or
+    (kubernetes_schedule_on_control_plane | string | lower == 'auto' and groups['k8s_workers'] | default([]) | length == 0)

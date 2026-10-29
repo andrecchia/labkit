@@ -1,0 +1,58 @@
+---
+_k8s_minor: "{{ kubernetes_version.split('.')[:2] | join('.') }}"
+_k8s_pinned: "{{ kubernetes_version.split('.') | length > 2 }}"
+_k8s_first_cp: "{{ groups['k8s_control_plane'][0] }}"
+_k8s_is_cp: "{{ inventory_hostname in groups['k8s_control_plane'] }}"
+_k8s_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+_k8s_cri_socket: unix:///run/containerd/containerd.sock
+
+_k8s_node_registration:
+  name: "{{ inventory_hostname }}"
+  criSocket: "{{ _k8s_cri_socket }}"
+  kubeletExtraArgs:
+    - name: node-ip
+      value: "{{ ansible_host }}"
+
+_k8s_init_configuration:
+  apiVersion: kubeadm.k8s.io/v1beta4
+  kind: InitConfiguration
+  localAPIEndpoint:
+    advertiseAddress: "{{ ansible_host }}"
+    bindPort: 6443
+  nodeRegistration: "{{ _k8s_node_registration }}"
+  skipPhases: "{{ [] if kubernetes_kube_proxy else ['addon/kube-proxy'] }}"
+
+_k8s_cluster_configuration:
+  apiVersion: kubeadm.k8s.io/v1beta4
+  kind: ClusterConfiguration
+  clusterName: "{{ kubernetes_cluster_name }}"
+  kubernetesVersion: "{{ _k8s_kubeadm_version | default('') }}"
+  controlPlaneEndpoint: "{{ kubernetes_control_plane_endpoint }}"
+  networking:
+    podSubnet: "{{ kubernetes_pod_cidr }}"
+    serviceSubnet: "{{ kubernetes_service_cidr }}"
+    dnsDomain: "{{ kubernetes_dns_domain }}"
+  apiServer:
+    certSANs: "{{ (groups['k8s_control_plane'] | map('extract', hostvars, 'ansible_host') | list) + kubernetes_api_cert_sans }}"
+
+_k8s_kubelet_configuration:
+  apiVersion: kubelet.config.k8s.io/v1beta1
+  kind: KubeletConfiguration
+  cgroupDriver: systemd
+
+_k8s_join_configuration:
+  apiVersion: kubeadm.k8s.io/v1beta4
+  kind: JoinConfiguration
+  discovery:
+    bootstrapToken:
+      apiServerEndpoint: "{{ kubernetes_control_plane_endpoint }}"
+      token: "{{ hostvars[_k8s_first_cp]['_k8s_join_token'] | default('') }}"
+      caCertHashes: ["{{ hostvars[_k8s_first_cp]['_k8s_join_ca_hash'] | default('') }}"]
+  nodeRegistration: "{{ _k8s_node_registration }}"
+
+_k8s_join_control_plane:
+  controlPlane:
+    localAPIEndpoint:
+      advertiseAddress: "{{ ansible_host }}"
+      bindPort: 6443
+    certificateKey: "{{ hostvars[_k8s_first_cp]['_k8s_cert_key'] | default('') }}"

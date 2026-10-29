@@ -1,0 +1,16 @@
+---
+ceph_demo_image: quay.io/ceph/demo:latest
+ceph_demo_container: "{{ lab_env | default('lab') }}-ceph-demo"
+ceph_demo_data_dir: "{{ lab_state_dir | default('/tmp') }}/ceph"
+ceph_demo_mon_ip: "{{ lab_network_gateway }}"
+ceph_demo_mon_port: 3300
+ceph_demo_public_network: "{{ lab_network_cidr }}"
+ceph_demo_recreate: false
+ceph_demo_pool: kubernetes
+ceph_demo_pg_num: 64
+ceph_demo_user: kubernetes
+ceph_demo_rgw:
+  uid: demouser
+  access_key: demokey
+  secret_key: demosecret
+  bucket: demobucket

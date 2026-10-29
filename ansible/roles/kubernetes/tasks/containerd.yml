@@ -1,0 +1,86 @@
+---
+# Upstream binaries instead of distro packages: same, pinned versions on every OS.
+- name: Read installed containerd and runc versions
+  ansible.builtin.shell: |
+    /usr/local/bin/containerd --version 2>/dev/null | awk '{print $3}'
+    /usr/local/sbin/runc --version 2>/dev/null | awk 'NR==1 {print $3}'
+  register: _k8s_rt_versions
+  changed_when: false
+
+- name: Install containerd {{ kubernetes_containerd_version }}
+  ansible.builtin.unarchive:
+    src: "https://github.com/containerd/containerd/releases/download/v{{ kubernetes_containerd_version }}/containerd-{{ kubernetes_containerd_version }}-linux-{{ _k8s_arch }}.tar.gz"
+    dest: /usr/local
+    remote_src: true
+  when: _k8s_rt_versions.stdout_lines[0] | default('') != 'v' ~ kubernetes_containerd_version
+  notify: Restart containerd
+
+- name: Install runc {{ kubernetes_runc_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/opencontainers/runc/releases/download/v{{ kubernetes_runc_version }}/runc.{{ _k8s_arch }}"
+    dest: /usr/local/sbin/runc
+    mode: "0755"
+    force: true
+  when: _k8s_rt_versions.stdout_lines[1] | default('') != kubernetes_runc_version
+
+- name: Create the CNI plugin directory
+  ansible.builtin.file:
+    path: /opt/cni/bin
+    state: directory
+    mode: "0755"
+
+- name: Install CNI plugins {{ kubernetes_cni_plugins_version }}
+  ansible.builtin.unarchive:
+    src: "https://github.com/containernetworking/plugins/releases/download/v{{ kubernetes_cni_plugins_version }}/cni-plugins-linux-{{ _k8s_arch }}-v{{ kubernetes_cni_plugins_version }}.tgz"
+    dest: /opt/cni/bin
+    remote_src: true
+    creates: "/opt/cni/bin/.labkit-{{ kubernetes_cni_plugins_version }}"
+
+- name: Mark the installed CNI plugins version
+  ansible.builtin.copy:
+    dest: "/opt/cni/bin/.labkit-{{ kubernetes_cni_plugins_version }}"
+    content: ""
+    mode: "0644"
+
+- name: containerd systemd unit
+  ansible.builtin.template:
+    src: containerd.service.j2
+    dest: /etc/systemd/system/containerd.service
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Create /etc/containerd
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+
+- name: Generate the default containerd config
+  ansible.builtin.command: /usr/local/bin/containerd config default
+  register: _k8s_containerd_default
+  changed_when: false
+
+- name: containerd config (systemd cgroup driver)
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    content: "{{ _k8s_containerd_default.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}\n"
+    mode: "0644"
+  notify: Restart containerd
+
+- name: crictl talks to containerd
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: |
+      runtime-endpoint: {{ _k8s_cri_socket }}
+      image-endpoint: {{ _k8s_cri_socket }}
+    mode: "0644"
+
+- name: Start containerd
+  ansible.builtin.systemd_service:
+    name: containerd
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Apply containerd changes before kubeadm runs
+  ansible.builtin.meta: flush_handlers

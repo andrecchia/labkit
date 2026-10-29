@@ -1,0 +1,18 @@
+csiConfig:
+  - clusterID: "{{ _ceph_cluster_id }}"
+    monitors: {{ ceph_csi_monitors | to_json }}
+driverName: {{ ceph_csi_driver_name }}
+storageClass:
+  create: true
+  name: {{ ceph_csi_storage_class }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "{{ ceph_csi_default_class | string | lower }}"
+  clusterID: "{{ _ceph_cluster_id }}"
+  pool: {{ ceph_csi_pool }}
+  mountOptions:
+    - discard
+secret:
+  create: true
+  name: csi-rbd-secret
+  userID: {{ ceph_csi_user }}
+  userKey: "{{ _ceph_user_key }}"

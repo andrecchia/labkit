@@ -1,0 +1,23 @@
+argument_specs:
+  main:
+    short_description: cert-manager
+    options:
+      cert_manager_version:
+        type: str
+        description: Chart version
+      cert_manager_namespace:
+        type: str
+        description: Namespace (also holds the CA secrets of ClusterIssuers)
+      cert_manager_gateway_api:
+        type: bool
+        description: Enable Gateway API support (default on when the gateway component is enabled)
+      cert_manager_issuers:
+        type: list
+        elements: dict
+        description: >-
+          ClusterIssuers to create, each {name, type} with type selfsigned | ca | acme.
+          acme takes email, server (default Let's Encrypt staging) and optional solvers
+          (default HTTP-01 through the shared Gateway, or the ingress class)
+      cert_manager_values:
+        type: dict
+        description: Helm values merged over the generated ones

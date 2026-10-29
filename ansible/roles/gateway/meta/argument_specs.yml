@@ -1,0 +1,37 @@
+argument_specs:
+  main:
+    short_description: Gateway API controller
+    options:
+      gateway_provider:
+        type: str
+        choices: [envoy-gateway, nginx-gateway-fabric, traefik]
+        description: Controller implementing the Gateway API
+      gateway_version:
+        type: str
+        description: Chart version (empty = tested default, see gateway_catalog)
+      gateway_namespace:
+        type: str
+        description: Namespace of the controller and of the shared Gateway (default per provider)
+      gateway_class:
+        type: str
+        description: GatewayClass name (default per provider)
+      gateway_api_version:
+        type: str
+        description: Gateway API CRDs release, for providers that do not bundle them
+      gateway_api_channel:
+        type: str
+        choices: [standard, experimental]
+        description: Gateway API CRDs channel
+      gateway_create:
+        type: bool
+        description: Create a shared Gateway that routes from every namespace can attach to
+      gateway_name:
+        type: str
+        description: Name of the shared Gateway
+      gateway_listeners:
+        type: list
+        elements: dict
+        description: Listeners of the shared Gateway (default one HTTP listener for any hostname)
+      gateway_values:
+        type: dict
+        description: Helm values merged over the generated ones

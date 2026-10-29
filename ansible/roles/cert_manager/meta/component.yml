@@ -1,0 +1,6 @@
+description: cert-manager + ClusterIssuers (self-signed, local CA, ACME/Let's Encrypt)
+hosts: k8s_control_plane[0]
+requires: [cni]
+after: [ingress, gateway]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

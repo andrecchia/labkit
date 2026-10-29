@@ -1,0 +1,37 @@
+argument_specs:
+  main:
+    short_description: Ceph demo container on the host
+    options:
+      ceph_demo_image:
+        type: str
+        description: Container image
+      ceph_demo_container:
+        type: str
+        description: Container name
+      ceph_demo_data_dir:
+        type: str
+        description: Host directory for /var/lib/ceph (default inside the env .state)
+      ceph_demo_mon_ip:
+        type: str
+        description: Monitor IP (default the host address on the VM network)
+      ceph_demo_mon_port:
+        type: int
+        description: Monitor port given to ceph-csi
+      ceph_demo_public_network:
+        type: str
+        description: Ceph public network (default the VM network)
+      ceph_demo_recreate:
+        type: bool
+        description: Remove and recreate the container (data dir is kept)
+      ceph_demo_pool:
+        type: str
+        description: RBD pool to create
+      ceph_demo_pg_num:
+        type: int
+        description: Placement groups of the pool
+      ceph_demo_user:
+        type: str
+        description: Ceph client user for ceph-csi (client.NAME)
+      ceph_demo_rgw:
+        type: dict
+        description: RGW demo user/bucket as {uid, access_key, secret_key, bucket}

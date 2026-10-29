@@ -1,0 +1,8 @@
+---
+metallb_version: "0.16.1"
+metallb_values: {}
+metallb_namespace: metallb-system
+metallb_pools:
+  - name: default
+    addresses: ["{{ lab_lb_range }}"]
+metallb_l2_advertisement: true

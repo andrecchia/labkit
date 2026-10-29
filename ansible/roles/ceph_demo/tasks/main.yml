@@ -1,0 +1,60 @@
+---
+- name: Inspect the ceph container
+  ansible.builtin.command: docker inspect --format {{ '{{' }}.State.Running{{ '}}' }} {{ ceph_demo_container }}
+  register: _ceph_inspect
+  changed_when: false
+  failed_when: false
+
+- name: Remove the ceph container
+  ansible.builtin.command: docker rm -f {{ ceph_demo_container }}
+  when: _ceph_inspect.rc == 0 and ceph_demo_recreate
+  changed_when: true
+
+- name: Create the data directory
+  ansible.builtin.file:
+    path: "{{ ceph_demo_data_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Start the ceph container
+  ansible.builtin.command: >-
+    docker run -d --name {{ ceph_demo_container }} --network host --restart unless-stopped
+    -v {{ ceph_demo_data_dir }}:/var/lib/ceph
+    -e MON_IP={{ ceph_demo_mon_ip }}
+    -e CEPH_PUBLIC_NETWORK={{ ceph_demo_public_network }}
+    -e CEPH_DEMO_UID={{ ceph_demo_rgw.uid }}
+    -e CEPH_DEMO_ACCESS_KEY={{ ceph_demo_rgw.access_key }}
+    -e CEPH_DEMO_SECRET_KEY={{ ceph_demo_rgw.secret_key }}
+    -e CEPH_DEMO_BUCKET={{ ceph_demo_rgw.bucket }}
+    {{ ceph_demo_image }}
+  when: _ceph_inspect.rc != 0 or ceph_demo_recreate
+  changed_when: true
+
+- name: Start the stopped ceph container
+  ansible.builtin.command: docker start {{ ceph_demo_container }}
+  when: _ceph_inspect.rc == 0 and not ceph_demo_recreate and _ceph_inspect.stdout != 'true'
+  changed_when: true
+
+- name: Wait for HEALTH_OK
+  ansible.builtin.command: docker exec {{ ceph_demo_container }} ceph health
+  register: _ceph_health
+  until: _ceph_health.rc == 0 and 'HEALTH_OK' in _ceph_health.stdout
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Create the RBD pool
+  ansible.builtin.command: docker exec {{ ceph_demo_container }} ceph osd pool create {{ ceph_demo_pool }} {{ ceph_demo_pg_num }}
+  register: _ceph_pool
+  changed_when: "'already exists' not in _ceph_pool.stderr"
+
+- name: Initialise the pool for RBD
+  ansible.builtin.command: docker exec {{ ceph_demo_container }} rbd pool init {{ ceph_demo_pool }}
+  when: _ceph_pool is changed
+  changed_when: true
+
+- name: Create the ceph-csi user
+  ansible.builtin.command: >-
+    docker exec {{ ceph_demo_container }} ceph auth get-or-create client.{{ ceph_demo_user }}
+    mon 'profile rbd' osd 'profile rbd pool={{ ceph_demo_pool }}' mgr 'profile rbd pool={{ ceph_demo_pool }}'
+  changed_when: false

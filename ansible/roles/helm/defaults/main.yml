@@ -1,0 +1,5 @@
+---
+# Helper role (not a component): installs the helm CLI on the target.
+# Chart-based components pull it in through meta/main.yml dependencies.
+helm_version: "4.3.1"
+helm_bin: /usr/local/bin/helm

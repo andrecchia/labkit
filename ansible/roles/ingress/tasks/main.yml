@@ -1,0 +1,31 @@
+---
+- name: Install the {{ ingress_provider }} ingress controller
+  kubernetes.core.helm:
+    binary_path: "{{ helm_bin }}"
+    name: "{{ _ing.release }}"
+    chart_repo_url: "{{ _ing.repo }}"
+    chart_ref: "{{ _ing.chart }}"
+    chart_version: "{{ ingress_version or _ing.version }}"
+    release_namespace: "{{ ingress_namespace }}"
+    create_namespace: true
+    values: "{{ _ing['values'] | combine(ingress_values, recursive=True) }}"
+    wait: true
+    wait_timeout: 10m
+  vars:
+    _ing: "{{ ingress_catalog[ingress_provider] }}"
+
+- name: Wait for the load-balancer address
+  ansible.builtin.command: >-
+    kubectl -n {{ ingress_namespace }} get svc
+    -o jsonpath='{.items[?(@.spec.type=="LoadBalancer")].status.loadBalancer.ingress[0].ip}'
+  register: _ingress_ip
+  until: _ingress_ip.stdout | length > 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: ingress_service_type == 'LoadBalancer' and 'loadbalancer' in lab_capabilities | default([])
+
+- name: Ingress address
+  ansible.builtin.debug:
+    msg: "{{ ingress_provider }} (class {{ ingress_class }}) listens on {{ _ingress_ip.stdout }}"
+  when: _ingress_ip.stdout is defined

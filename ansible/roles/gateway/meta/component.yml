@@ -1,0 +1,6 @@
+description: Gateway API controller (envoy-gateway, nginx-gateway-fabric or traefik) + a shared Gateway
+hosts: k8s_control_plane[0]
+requires: [cni]
+after: [loadbalancer]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

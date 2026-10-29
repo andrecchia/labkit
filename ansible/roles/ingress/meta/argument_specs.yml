@@ -1,0 +1,30 @@
+argument_specs:
+  main:
+    short_description: Ingress controller
+    options:
+      ingress_provider:
+        type: str
+        choices: [traefik, haproxy, ingress-nginx]
+        description: Controller to install (ingress-nginx is retired upstream, kept for legacy setups)
+      ingress_version:
+        type: str
+        description: Chart version (empty = tested default, see ingress_catalog)
+      ingress_namespace:
+        type: str
+        description: Namespace (default per provider)
+      ingress_class:
+        type: str
+        description: IngressClass name (default per provider)
+      ingress_default_class:
+        type: bool
+        description: Make it the default IngressClass
+      ingress_service_type:
+        type: str
+        choices: [LoadBalancer, NodePort]
+        description: Service type of the controller
+      ingress_load_balancer_ip:
+        type: str
+        description: Fixed IP from the MetalLB range (empty = any)
+      ingress_values:
+        type: dict
+        description: Helm values merged over the generated ones

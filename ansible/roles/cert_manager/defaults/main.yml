@@ -1,0 +1,28 @@
+---
+cert_manager_version: "v1.21.2"
+cert_manager_namespace: cert-manager
+cert_manager_gateway_api: "{{ 'gateway' in lab_components | default([]) }}"
+cert_manager_issuers:
+  - name: selfsigned
+    type: selfsigned
+  - name: lab-ca # local CA: browsers trust it once you import the lab-ca-root secret's ca.crt
+    type: ca
+  # - name: letsencrypt-staging
+  #   type: acme
+  #   email: you@example.com
+  #   server: https://acme-staging-v02.api.letsencrypt.org/directory
+cert_manager_values: {}
+
+_cert_manager_values:
+  crds:
+    enabled: true
+  config:
+    apiVersion: controller.config.cert-manager.io/v1alpha1
+    kind: ControllerConfiguration
+    enableGatewayAPI: "{{ cert_manager_gateway_api | bool }}"
+
+# Default HTTP-01 solver for acme issuers: the shared Gateway if there is one, else the ingress class
+_cert_manager_http01: >-
+  {{ {'gatewayHTTPRoute': {'parentRefs': [{'name': gateway_name, 'namespace': gateway_namespace, 'kind': 'Gateway'}]}}
+     if ('gateway' in lab_components | default([]) and gateway_create | default(false))
+     else {'ingress': {'ingressClassName': ingress_class | default('')}} }}

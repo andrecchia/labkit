@@ -1,0 +1,57 @@
+{% for issuer in cert_manager_issuers %}
+{% if issuer.type == 'selfsigned' %}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ issuer.name }}
+spec:
+  selfSigned: {}
+{% elif issuer.type == 'ca' %}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ issuer.name }}-bootstrap
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ issuer.name }}-root
+  namespace: {{ cert_manager_namespace }}
+spec:
+  isCA: true
+  commonName: {{ issuer.common_name | default(lab_env | default('lab') ~ ' ' ~ issuer.name) }}
+  secretName: {{ issuer.name }}-root
+  duration: {{ issuer.duration | default('87600h') }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: {{ issuer.name }}-bootstrap
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ issuer.name }}
+spec:
+  ca:
+    secretName: {{ issuer.name }}-root
+{% elif issuer.type == 'acme' %}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ issuer.name }}
+spec:
+  acme:
+    email: {{ issuer.email }}
+    server: {{ issuer.server | default('https://acme-staging-v02.api.letsencrypt.org/directory') }}
+    privateKeySecretRef:
+      name: {{ issuer.name }}-account
+    solvers: {{ issuer.solvers | default([{'http01': _cert_manager_http01}]) | to_json }}
+{% endif %}
+{% endfor %}

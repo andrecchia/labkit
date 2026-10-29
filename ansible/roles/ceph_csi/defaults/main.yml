@@ -1,0 +1,13 @@
+---
+ceph_csi_version: "3.18.1"
+ceph_csi_namespace: ceph-csi-rbd
+ceph_csi_driver_name: rbd.csi.ceph.com
+ceph_csi_storage_class: ceph-rbd
+ceph_csi_default_class: true
+# empty = taken from the ceph_demo component
+ceph_csi_cluster_id: ""
+ceph_csi_monitors: ["{{ ceph_demo_mon_ip | default('') }}:{{ ceph_demo_mon_port | default(3300) }}"]
+ceph_csi_pool: "{{ ceph_demo_pool | default('kubernetes') }}"
+ceph_csi_user: "{{ ceph_demo_user | default('kubernetes') }}"
+ceph_csi_user_key: ""
+ceph_csi_values: {}

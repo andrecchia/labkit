@@ -1,0 +1,20 @@
+argument_specs:
+  main:
+    short_description: MetalLB load balancer
+    options:
+      metallb_version:
+        type: str
+        description: Chart version
+      metallb_namespace:
+        type: str
+        description: Namespace
+      metallb_values:
+        type: dict
+        description: Helm values merged over the defaults
+      metallb_pools:
+        type: list
+        elements: dict
+        description: IPAddressPools as {name, addresses, auto_assign}. Default uses the top of the VM network
+      metallb_l2_advertisement:
+        type: bool
+        description: Announce every pool with an L2Advertisement

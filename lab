@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# labkit entry point. Keeps a private venv (ansible-core + collections) up to date,
+# then runs the Python CLI. Symlink it into your PATH: ln -s "$PWD/lab" ~/.local/bin/lab
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+VENV="${LABKIT_VENV:-$ROOT/.venv}"
+STAMP="$VENV/.labkit-deps"
+DEPS=("$ROOT/requirements.txt" "$ROOT/ansible/requirements.yml")
+
+deps_hash() { cat "${DEPS[@]}" | sha256sum | cut -d' ' -f1; }
+
+if [[ ! -x "$VENV/bin/python" || "$(cat "$STAMP" 2>/dev/null)" != "$(deps_hash)" ]]; then
+  printf '\033[1;34m==>\033[0m setting up %s (python deps + ansible collections)\n' "$VENV" >&2
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install --quiet --upgrade pip
+  "$VENV/bin/pip" install --quiet -r "$ROOT/requirements.txt"
+  "$VENV/bin/ansible-galaxy" collection install --upgrade -r "$ROOT/ansible/requirements.yml" -p "$VENV/collections" >/dev/null
+  deps_hash > "$STAMP"
+fi
+
+PYTHONPATH="$ROOT/tools${PYTHONPATH:+:$PYTHONPATH}" exec "$VENV/bin/python" -m lab "$@"

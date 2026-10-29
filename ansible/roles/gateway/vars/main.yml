@@ -1,0 +1,2 @@
+---
+_gw: "{{ gateway_catalog[gateway_provider] }}"

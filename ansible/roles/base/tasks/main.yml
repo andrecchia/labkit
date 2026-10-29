@@ -1,0 +1,55 @@
+---
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Add every inventory host to /etc/hosts
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} labkit hosts"
+    block: |
+      {% for h in groups['all'] | sort %}
+      {{ hostvars[h]['ansible_host'] }} {{ h }}
+      {% endfor %}
+  when: base_etc_hosts
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Upgrade all packages
+  ansible.builtin.package:
+    name: "*"
+    state: latest # noqa package-latest
+  when: base_upgrade and ansible_facts['os_family'] == 'RedHat'
+
+- name: Upgrade all packages
+  ansible.builtin.apt:
+    upgrade: dist
+  when: base_upgrade and ansible_facts['os_family'] == 'Debian'
+
+- name: Install packages
+  ansible.builtin.package:
+    name: "{{ (base_packages + base_extra_packages) | unique }}"
+    state: present
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+  when: base_timezone | length > 0
+
+- name: Check whether a reboot is required
+  ansible.builtin.command: "{{ 'needs-restarting -r' if ansible_facts['os_family'] == 'RedHat' else 'test -f /var/run/reboot-required' }}"
+  register: _base_reboot
+  changed_when: false
+  failed_when: false
+  when: base_reboot_if_needed
+
+- name: Reboot
+  ansible.builtin.reboot:
+    reboot_timeout: 600
+  when:
+    - base_reboot_if_needed
+    - (ansible_facts['os_family'] == 'RedHat' and _base_reboot.rc == 1) or (ansible_facts['os_family'] != 'RedHat' and _base_reboot.rc == 0)

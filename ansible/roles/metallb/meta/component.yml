@@ -1,0 +1,6 @@
+description: MetalLB L2 load balancer (gives LoadBalancer services an IP of the VM network)
+hosts: k8s_control_plane[0]
+requires: [cni]
+provides: [loadbalancer]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

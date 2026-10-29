@@ -1,0 +1,20 @@
+---
+- name: Kubernetes yum repository (v{{ _k8s_minor }})
+  ansible.builtin.yum_repository:
+    name: kubernetes
+    description: "Kubernetes v{{ _k8s_minor }}"
+    baseurl: "https://pkgs.k8s.io/core:/stable:/v{{ _k8s_minor }}/rpm/"
+    gpgcheck: true
+    gpgkey: "https://pkgs.k8s.io/core:/stable:/v{{ _k8s_minor }}/rpm/repodata/repomd.xml.key"
+    exclude: [kubelet, kubeadm, kubectl, cri-tools, kubernetes-cni] # no accidental upgrades
+
+- name: Install kubelet, kubeadm, kubectl {{ kubernetes_version }}
+  ansible.builtin.dnf:
+    name: "{{ ['kubelet', 'kubeadm', 'kubectl'] | product([('-' ~ kubernetes_version) if _k8s_pinned else '']) | map('join') | list }}"
+    disable_excludes: kubernetes
+    allow_downgrade: true
+
+- name: Enable kubelet
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true

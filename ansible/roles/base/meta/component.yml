@@ -1,0 +1,2 @@
+description: OS baseline (hostname, /etc/hosts, packages, timezone, upgrades)
+hosts: all

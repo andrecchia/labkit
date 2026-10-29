@@ -1,0 +1,6 @@
+description: Ingress controller (traefik, haproxy or ingress-nginx)
+hosts: k8s_control_plane[0]
+requires: [cni]
+after: [loadbalancer]
+environment:
+  KUBECONFIG: "{{ kubernetes_admin_kubeconfig }}"

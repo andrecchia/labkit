@@ -1,0 +1,17 @@
+argument_specs:
+  main:
+    short_description: Pod network plugin
+    options:
+      cni_provider:
+        type: str
+        choices: [cilium, calico, flannel]
+        description: Which CNI to install (cannot be changed on a running cluster)
+      cni_version:
+        type: str
+        description: Chart version (empty = the tested default of the provider, see cni_catalog)
+      cni_values:
+        type: dict
+        description: Helm values merged over the generated ones
+      cni_cilium_kube_proxy_replacement:
+        type: bool
+        description: cilium replaces kube-proxy (requires kubernetes.kube_proxy=false; default follows it)

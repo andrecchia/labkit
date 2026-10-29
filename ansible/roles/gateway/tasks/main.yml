@@ -1,0 +1,64 @@
+---
+- name: Gateway API CRDs {{ gateway_api_version }} ({{ gateway_api_channel }})
+  when: not _gw.bundles_crds
+  block:
+    - name: Read the installed Gateway API bundle version
+      ansible.builtin.command: >-
+        kubectl get crd gateways.gateway.networking.k8s.io
+        -o 'jsonpath={.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}'
+      register: _gw_crds
+      changed_when: false
+      failed_when: false
+
+    - name: Install the Gateway API CRDs
+      ansible.builtin.command: >-
+        kubectl apply --server-side --force-conflicts -f
+        https://github.com/kubernetes-sigs/gateway-api/releases/download/{{ gateway_api_version }}/{{ gateway_api_channel }}-install.yaml
+      when: _gw_crds.stdout != gateway_api_version
+      changed_when: true
+
+- name: Install {{ gateway_provider }}
+  kubernetes.core.helm:
+    binary_path: "{{ helm_bin }}"
+    name: "{{ _gw.release }}"
+    chart_repo_url: "{{ _gw.repo | default(omit) }}"
+    chart_ref: "{{ _gw.chart }}"
+    chart_version: "{{ gateway_version or _gw.version }}"
+    release_namespace: "{{ gateway_namespace }}"
+    create_namespace: true
+    values: "{{ _gw['values'] | combine(gateway_values, recursive=True) }}"
+    wait: true
+    wait_timeout: 10m
+
+- name: GatewayClass and shared Gateway
+  ansible.builtin.command: kubectl apply -f -
+  args:
+    stdin: "{{ lookup('ansible.builtin.template', 'gateway.yaml.j2') }}"
+  register: _gw_apply
+  changed_when: _gw_apply.stdout is search('created|configured')
+  retries: 6
+  delay: 5
+  until: _gw_apply.rc == 0
+  when: gateway_create or _gw.controller is defined
+
+- name: Wait for the shared Gateway to get an address
+  ansible.builtin.command: >-
+    kubectl -n {{ gateway_namespace }} wait gateway/{{ gateway_name }}
+    --for=condition=Programmed --timeout=300s
+  changed_when: false
+  when: gateway_create and 'loadbalancer' in lab_capabilities | default([])
+
+- name: Read the Gateway address
+  ansible.builtin.command: >-
+    kubectl -n {{ gateway_namespace }} get gateway/{{ gateway_name }} -o jsonpath={.status.addresses[0].value}
+  register: _gw_address
+  changed_when: false
+  when: gateway_create
+
+- name: Gateway address
+  ansible.builtin.debug:
+    msg: >-
+      Gateway {{ gateway_namespace }}/{{ gateway_name }} (class {{ gateway_class }}) listens on
+      {{ _gw_address.stdout or 'no address yet (no load balancer?)' }}. Attach HTTPRoutes with
+      parentRefs: [{name: {{ gateway_name }}, namespace: {{ gateway_namespace }}}]
+  when: gateway_create

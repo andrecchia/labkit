@@ -1,0 +1,28 @@
+---
+- name: Read the kubeadm version (= Kubernetes version of the control plane)
+  ansible.builtin.command: kubeadm version -o short
+  register: _k8s_kubeadm
+  changed_when: false
+
+- name: Write the kubeadm init configuration
+  ansible.builtin.copy:
+    dest: /etc/kubernetes/kubeadm-init.yaml
+    mode: "0600"
+    content: |
+      {{ _k8s_init_configuration | combine(kubernetes_init_config, recursive=True) | to_nice_yaml(indent=2) }}
+      ---
+      {{ _k8s_cluster_configuration | combine(kubernetes_cluster_config, recursive=True) | to_nice_yaml(indent=2) }}
+      ---
+      {{ _k8s_kubelet_configuration | combine(kubernetes_kubelet_config, recursive=True) | to_nice_yaml(indent=2) }}
+  vars:
+    _k8s_kubeadm_version: "{{ _k8s_kubeadm.stdout }}"
+
+- name: kubeadm init
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-init.yaml
+  args:
+    creates: /etc/kubernetes/admin.conf
+  register: _k8s_init
+
+- name: This node is now a cluster member
+  ansible.builtin.set_fact:
+    _k8s_member: true

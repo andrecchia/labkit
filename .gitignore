@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.part
+# environments are user data (lab new creates them here); see examples/ for a sample
+envs/*
+!envs/.gitkeep
+examples/*/.state/
+# never commit credentials
+kubeconfig
+*.kubeconfig
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.tfstate
+*.tfstate.*
+*.tfvars.json

@@ -1,0 +1,23 @@
+---
+- name: Install MetalLB
+  kubernetes.core.helm:
+    binary_path: "{{ helm_bin }}"
+    name: metallb
+    chart_repo_url: https://metallb.github.io/metallb
+    chart_ref: metallb
+    chart_version: "{{ metallb_version }}"
+    release_namespace: "{{ metallb_namespace }}"
+    create_namespace: true
+    values: "{{ metallb_values }}"
+    wait: true
+    wait_timeout: 10m
+
+- name: Address pools and L2 advertisement
+  ansible.builtin.command: kubectl apply -f -
+  args:
+    stdin: "{{ lookup('ansible.builtin.template', 'pools.yaml.j2') }}"
+  register: _metallb_apply
+  changed_when: _metallb_apply.stdout is search('created|configured')
+  retries: 12 # the admission webhook needs a few seconds after the rollout
+  delay: 5
+  until: _metallb_apply.rc == 0

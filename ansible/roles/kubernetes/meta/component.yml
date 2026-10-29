@@ -1,0 +1,4 @@
+description: Kubernetes with kubeadm + containerd (Debian/Ubuntu and RHEL/Alma)
+hosts: k8s_control_plane:k8s_workers
+requires_groups: [k8s_control_plane]
+after: [base]
